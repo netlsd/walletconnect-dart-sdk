@@ -1,26 +1,16 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 typedef OnSocketOpen = void Function(bool reconnectAttempt);
 typedef OnSocketClose = void Function();
 typedef OnMessage = void Function(dynamic data);
+typedef OnQueueSubscriptions = void Function();
 
 class ReconnectingWebSocket {
   /// The URL as resolved by the constructor.
   /// This is always an absolute URL. Read only.
   final String url;
-
-  /// The number of milliseconds to delay before attempting to reconnect.
-  final Duration reconnectInterval;
-
-  /// The maximum number of milliseconds to delay a reconnection attempt.
-  final Duration maxReconnectInterval;
-
-  /// The rate of increase of the reconnect delay.
-  /// Allows reconnect attempts to back off when problems persist.
-  final double reconnectDecay;
 
   /// The maximum number of reconnection attempts to make. Unlimited if null.
   final int? maxReconnectAttempts;
@@ -53,16 +43,16 @@ class ReconnectingWebSocket {
 
   OnMessage? onMessage;
 
+  OnQueueSubscriptions? onQueueSubscriptions;
+
   ReconnectingWebSocket({
     required this.url,
-    this.reconnectInterval = const Duration(milliseconds: 1000),
-    this.maxReconnectInterval = const Duration(milliseconds: 30000),
-    this.reconnectDecay = 1.5,
     this.maxReconnectAttempts,
     this.debug = false,
     this.onOpen,
     this.onClose,
     this.onMessage,
+    this.onQueueSubscriptions,
   });
 
   void open(bool reconnectAttempt) {
@@ -123,6 +113,7 @@ class ReconnectingWebSocket {
     _connected = true;
     _shouldReconnect = true;
     onOpen?.call(reconnectAttempt);
+    onQueueSubscriptions?.call();
   }
 
   void _onClose() {
@@ -140,9 +131,7 @@ class ReconnectingWebSocket {
 
     _reconnecting = true;
 
-    final timeout = reconnectInterval * pow(reconnectDecay, _reconnectAttempts);
-    final duration =
-        timeout > maxReconnectInterval ? maxReconnectInterval : timeout;
+    final duration = const Duration(seconds: 10);
 
     if (debug) {
       print('Reconnecting in: ${duration.inMilliseconds}');

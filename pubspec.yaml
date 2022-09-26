@@ -26,6 +26,7 @@ dependencies:
 
   # Stack trace
   stack_trace: ^1.10.0
+  flutter_secure_storage: ^5.0.2
 
 dev_dependencies:
   # Testing framework

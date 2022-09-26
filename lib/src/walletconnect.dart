@@ -51,6 +51,8 @@ class WalletConnect {
   /// The storage when sessions can be stored and retrieved.
   final SessionStorage? sessionStorage;
 
+  final String? storageKey;
+
   /// Default signing methods (for Ethereum)
   final List<String> signingMethods;
 
@@ -69,6 +71,7 @@ class WalletConnect {
   WalletConnect._internal({
     required this.session,
     required this.sessionStorage,
+    required this.storageKey,
     required this.signingMethods,
     required this.cipherBox,
     required SocketTransport transport,
@@ -94,6 +97,7 @@ class WalletConnect {
     String uri = '',
     WalletConnectSession? session,
     SessionStorage? sessionStorage,
+    String? storageKey,
     CipherBox? cipher,
     SocketTransport? transport,
     String? clientId,
@@ -109,12 +113,16 @@ class WalletConnect {
       bridge = BridgeUtils.getBridgeUrl(bridge);
     }
 
-    if (uri.isNotEmpty) {
+    if (session == null && uri.isNotEmpty) {
       session = WalletConnectSession.fromUri(
         uri: uri,
         clientId: clientId ?? const Uuid().v4(),
         clientMeta: clientMeta ?? const PeerMeta(),
       );
+
+      sessionStorage?.store(storageKey!, session);
+    } else {
+      print('restore session');
     }
 
     session = session ??
@@ -138,6 +146,7 @@ class WalletConnect {
     return WalletConnect._internal(
       session: session,
       sessionStorage: sessionStorage,
+      storageKey: storageKey,
       cipherBox: cipher,
       signingMethods: [...ethSigningMethods],
       transport: transport,
@@ -154,67 +163,10 @@ class WalletConnect {
         .listen((event) => callback(event.data));
   }
 
-  /// Creates a new session calling [createSession] if it doesnt exists, or returns the instantiated one.
-  Future<SessionStatus> connect(
-      {int? chainId, OnDisplayUriCallback? onDisplayUri}) async {
-    if (connected) {
-      onDisplayUri?.call(session.toUri());
-      return SessionStatus(
-        chainId: session.chainId,
-        accounts: session.accounts,
-      );
-    }
-
-    return await createSession(chainId: chainId, onDisplayUri: onDisplayUri);
-  }
-
   /// Reconnects to the web socket server.
   void reconnect() {
     _transport.close(forceClose: true);
     _transport.open();
-  }
-
-  /// Creates a new session between the dApp and wallet.
-  /// The dapp should call this method for initiating the session.
-  /// https://docs.walletconnect.com/client-api#create-new-session-session_request
-  Future<SessionStatus> createSession({
-    int? chainId,
-    OnDisplayUriCallback? onDisplayUri,
-  }) async {
-    if (connected) {
-      throw WalletConnectException('Session currently connected');
-    }
-
-    // Generate encryption key
-    session.key = await cipherBox.generateKey();
-
-    final request = JsonRpcRequest(
-      id: payloadId,
-      method: 'wc_sessionRequest',
-      params: [
-        {
-          'peerId': session.clientId,
-          'peerMeta': session.clientMeta,
-          'chainId': chainId,
-        }
-      ],
-    );
-
-    session.handshakeId = request.id;
-    session.handshakeTopic = const Uuid().v4();
-
-    // Display the URI
-    final uri = session.toUri();
-    onDisplayUri?.call(uri);
-    _eventBus.fire(Event<String>('display_uri', uri));
-
-    // Send the request
-    final response = await _sendRequest(request, topic: session.handshakeTopic);
-
-    // Notify listeners
-    await _handleSessionResponse(response);
-
-    return WCSessionRequestResponse.fromJson(response).status;
   }
 
   /// Approves the session requested by the peer (dApp), responding with the accounts and client's id and meta.
@@ -391,7 +343,7 @@ class WalletConnect {
       ],
     );
 
-    unawaited(_sendRequest(request));
+    await _sendRequest(request);
 
     await _handleSessionDisconnect(errorMessage: message, forceClose: true);
   }
@@ -606,7 +558,7 @@ class WalletConnect {
       session.approve(params);
 
       // Store session
-      await sessionStorage?.store(session);
+      await sessionStorage?.store(storageKey!, session);
 
       // Notify the listeners
       final data = WCSessionRequestResponse.fromJson(params);
@@ -616,7 +568,7 @@ class WalletConnect {
       session.approve(params);
 
       // Store session
-      await sessionStorage?.store(session);
+      await sessionStorage?.store(storageKey!, session);
 
       // Notify the listeners
       final data = WCSessionUpdateResponse.fromJson(params);
@@ -633,7 +585,7 @@ class WalletConnect {
     session.reset();
 
     // Remove storage session
-    await sessionStorage?.removeSession();
+    await sessionStorage?.removeSession(storageKey!);
 
     // Close the web socket connection
     await _transport.close(forceClose: forceClose);

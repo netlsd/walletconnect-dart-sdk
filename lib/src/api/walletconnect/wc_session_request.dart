@@ -8,7 +8,7 @@ part 'wc_session_request.g.dart';
 @JsonSerializable()
 class WCSessionRequest {
   @JsonKey(name: 'chainId')
-  final int? chainId;
+  int? chainId;
 
   @JsonKey(name: 'peerId')
   final String? peerId;

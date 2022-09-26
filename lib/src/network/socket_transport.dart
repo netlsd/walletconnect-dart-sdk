@@ -38,17 +38,15 @@ class SocketTransport {
 
     _socket = ReconnectingWebSocket(
       url: wsUrl,
-      maxReconnectAttempts: 5,
+      maxReconnectAttempts: 200,
       debug: false,
       onOpen: onOpen,
       onClose: onClose,
       onMessage: _socketReceive,
+      onQueueSubscriptions: _queueSubscriptions,
     );
 
     _socket?.open(false);
-
-    // Queue subscriptions
-    _queueSubscriptions();
   }
 
   /// Closes the web socket connection.
