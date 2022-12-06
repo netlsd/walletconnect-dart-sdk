@@ -119,8 +119,6 @@ class WalletConnect {
         clientId: clientId ?? const Uuid().v4(),
         clientMeta: clientMeta ?? const PeerMeta(),
       );
-
-      sessionStorage?.store(storageKey!, session);
     } else {
       print('restore session');
     }
@@ -196,6 +194,8 @@ class WalletConnect {
 
     await _sendResponse(response);
     session.connected = true;
+    session.chainId = chainId;
+    await sessionStorage?.store(storageKey!, session);
 
     // Notify listeners
     _eventBus.fire(Event<SessionStatus>(
@@ -228,7 +228,8 @@ class WalletConnect {
     session.connected = false;
 
     // Notify listeners
-    _eventBus.fire(Event<String>('disconnect', message));
+    _eventBus
+        .fire(Event<Map<String, dynamic>>('disconnect', {'message': message}));
   }
 
   /// Updates the actual session requesting the peer to change some session data
@@ -343,8 +344,7 @@ class WalletConnect {
       ],
     );
 
-    await _sendRequest(request);
-
+    unawaited(_sendRequest(request));
     await _handleSessionDisconnect(errorMessage: message, forceClose: true);
   }
 
