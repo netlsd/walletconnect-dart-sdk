@@ -345,7 +345,7 @@ class WalletConnect {
     );
 
     unawaited(_sendRequest(request));
-    await _handleSessionDisconnect(errorMessage: message, forceClose: true);
+    unawaited(_handleSessionDisconnect(errorMessage: message, forceClose: true));
   }
 
   /// Close the connection
@@ -582,18 +582,18 @@ class WalletConnect {
     String? errorMessage,
     bool forceClose = false,
   }) async {
+    // Notify listeners
+    _eventBus.fire(Event<Map<String, dynamic>>('disconnect', {
+      'message': errorMessage ?? '',
+    }));
+
     session.reset();
 
     // Remove storage session
     await sessionStorage?.removeSession(storageKey!);
 
     // Close the web socket connection
-    await _transport.close(forceClose: forceClose);
-
-    // Notify listeners
-    _eventBus.fire(Event<Map<String, dynamic>>('disconnect', {
-      'message': errorMessage ?? '',
-    }));
+    unawaited(_transport.close(forceClose: forceClose));
   }
 }
 
