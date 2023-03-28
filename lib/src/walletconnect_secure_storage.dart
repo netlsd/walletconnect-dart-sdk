@@ -1,18 +1,15 @@
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletconnect_dart/walletconnect_dart.dart';
 
 class WalletConnectSecureStorage implements SessionStorage {
-  final FlutterSecureStorage _storage;
-
-  WalletConnectSecureStorage({
-    FlutterSecureStorage? storage,
-  }) : _storage = storage ?? const FlutterSecureStorage();
 
   @override
   Future<WalletConnectSession?> getSession(String storageKey) async {
-    final json = await _storage.read(key: storageKey);
+    var storage = await SharedPreferences.getInstance();
+
+    final json = storage.getString(storageKey);
     if (json == null) {
       return null;
     }
@@ -27,11 +24,13 @@ class WalletConnectSecureStorage implements SessionStorage {
 
   @override
   Future store(String storageKey, WalletConnectSession session) async {
-    await _storage.write(key: storageKey, value: jsonEncode(session.toJson()));
+    var storage = await SharedPreferences.getInstance();
+    await storage.setString(storageKey, jsonEncode(session.toJson()));
   }
 
   @override
   Future removeSession(String storageKey) async {
-    await _storage.delete(key: storageKey);
+    var storage = await SharedPreferences.getInstance();
+    await storage.remove(storageKey);
   }
 }
